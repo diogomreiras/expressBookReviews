@@ -64,24 +64,14 @@ regd_users.put("/auth/review/:isbn", (req, res) => {
   const review = req.query?.review;
   if (book) {
     if (review) {
-      let reviewByUser = book.reviews[req.body.username];
+      const previousReview = book.reviews[req.body.username];
+      book.reviews[req.body.username] = review;
 
-      // If a review already exists by this user, then update it.
-      if (reviewByUser) {
-        book.reviews[req.body.username] = review;
-
-        return res.status(200).json({ message: "Review updated." });
-      } else {
-        // If a review does not yet exist from this user, insert it.
-        book.reviews[req.body.username] = review;
-
-        return res.status(200).json({ message: "Review created." });
-      }
+      // If a review already exists by this user, then update it, otherwise create it.
+      return res.status(200).json({ message: "Review " + (previousReview ? "updated" : "created") + "." });
     } else {
-      return res.status(404).json({ message: "The query 'review' must be provided." });
+      return res.status(404).json({ message: "The provided ISBN does not exist." });
     }
-  } else {
-    return res.status(404).json({ message: "The provided ISBN does not exist." });
   }
 });
 
