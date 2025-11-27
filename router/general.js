@@ -1,19 +1,28 @@
 const express = require('express');
 
 let books = require("./booksdb.js");
-const { log } = require("./../resources/helpers.js");
+const { log, toStr } = require("./../resources/helpers.js");
 const { isUsernameValid, users } = require('./auth_users.js');
 
 const public_users = express.Router();
 
 
 
-// Define a non-protected resource to check how long the server is running
+// Check how long the server is running
 public_users.all("/ping", (req, res, next) => {
   log(req.method, "/ping", "query:", req.query, "params:", req.params);
 
   return res.status(200).send(`Current runtime: ${Math.round(process.uptime())} seconds`);
 });
+
+// Get the list of registered users
+public_users.get('/users', function (req, res) {
+  log(req.method, "/", "users:", req.query, "params:", req.params);
+
+  return res.status(200).json(users);
+});
+
+
 
 // Save a new user to allow it to login
 public_users.post("/register", (req, res) => {
@@ -50,43 +59,127 @@ public_users.post("/register", (req, res) => {
   }
 });
 
-// Get the book list available in the shop
-public_users.get('/users', function (req, res) {
-  log(req.method, "/", "users:", req.query, "params:", req.params);
 
-  return res.status(200).json(users);
-});
+
+/**
+ * Returns a Promise wiht all the books after 1s, simulating a time consuming operation.
+ * @returns {[object]} the book(s) avaible in our DB
+ */
+function getBooks() {
+  return new Promise((resolve, reject) =>
+    setTimeout(() => {
+      resolve(books)
+    }, 1000)
+  );
+}
 
 // Get the book list available in the shop
 public_users.get('/', function (req, res) {
   log(req.method, "/", "query:", req.query, "params:", req.params);
 
-  return res.status(200).json(books);
+  // Creates a promise that returns the books after 1 second.
+  // This simulates a time consuming operation like a data retrieval from the database.
+  getBooks().then((books) => {
+    return res.status(200).json(books);
+  }).catch((err) => {
+    return res.status(400).json({ error: err, message: 'Error on retrieving the books.' });
+  });
 });
+
+
+
+/**
+ * Returns a Promise with the book with the given ISBN after some time, simulating a time consuming operation.
+ * @param {(number|string)} isbn - the ID of this book
+ */
+function getBookByISBN(isbn) {
+  return getBooks().then(x => x[isbn]);
+}
 
 // Get book details based on ISBN
-public_users.get('/isbn/:isbn', function (req, res) {
+public_users.get('/isbn/:isbn', async function (req, res) {
   log(req.method, "/isbn/:isbn", "query:", req.query, "params:", req.params);
 
-  const result = books[req.params.isbn];
-  return res.status(result ? 200 : 404).json(result ?? {});
+  try {
+    return getBookByISBN(req.params.isbn)
+      .then(result =>
+        res
+          .status(result ? 200 : 404)
+          .json(result ?? {})
+      )
+      .catch(err =>
+        res
+          .status(404)
+          .json({ error: err, message: 'Error on retrieving the book with this ISBN.' })
+      );
+  } catch (err) {
+    res.status(404).json({ error: err, message: 'Error on retrieving the book with this ISBN.' });
+  }
 });
+
+
+
+/**
+ * Returns a Promise with the book with the given author after some time, simulating a time consuming operation.
+ * @param {(number|string)} isbn - the ID of this book
+ */
+function getBookByAuthor(author) {
+  return getBooks().then(books => Object.values(books).filter(book => book.author === author));
+}
 
 // Get book details based on author
 public_users.get('/author/:author', function (req, res) {
   log(req.method, "/author/:author", "query:", req.query, "params:", req.params);
 
-  const result = Object.values(books).find(book => book.author === req.params.author);
-  return res.status(result ? 200 : 404).json(result ?? {});
+  try {
+    return getBookByAuthor(req.params.author)
+      .then(result =>
+        res
+          .status(result ? 200 : 404)
+          .json(result ?? {})
+      )
+      .catch(err =>
+        res
+          .status(404)
+          .json({ error: err, message: 'Error on retrieving the book with this author.' })
+      );
+  } catch (err) {
+    res.status(404).json({ error: err, message: 'Error on retrieving the book with this author.' });
+  }
 });
+
+
+
+/**
+ * Returns a Promise with the book with the given title after some time, simulating a time consuming operation.
+ * @param {(number|string)} isbn - the ID of this book
+ */
+function getBookByTitle(title) {
+  return getBooks().then(books => Object.values(books).filter(book => book.title === title));
+}
 
 // Get all books based on title
 public_users.get('/title/:title', function (req, res) {
   log(req.method, "/title/:title", "query:", req.query, "params:", req.params);
 
-  const result = Object.values(books).find(book => book.title === req.params.title);
-  return res.status(result ? 200 : 404).json(result ?? {});
+  try {
+    return getBookByTitle(req.params.title)
+      .then(result =>
+        res
+          .status(result ? 200 : 404)
+          .json(result ?? {})
+      )
+      .catch(err =>
+        res
+          .status(404)
+          .json({ error: err, message: 'Error on retrieving the book with this title.' })
+      );
+  } catch (err) {
+    res.status(404).json({ error: err, message: 'Error on retrieving the book with this title.' });
+  }
 });
+
+
 
 //  Get book review
 public_users.get('/review/:isbn', function (req, res) {
@@ -95,5 +188,7 @@ public_users.get('/review/:isbn', function (req, res) {
   const result = books[req.params.isbn];
   return res.status(result ? 200 : 404).json(result ? result.reviews : {});
 });
+
+
 
 module.exports.general = public_users;
